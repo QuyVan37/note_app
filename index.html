@@ -1,1 +1,1716 @@
 
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>汉字本 — Sổ tay tiếng Trung</title>
+<!-- pinyin-pro: chuyển Hán tự → pinyin có dấu thanh, chạy offline sau khi load -->
+<script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.25.0/dist/index.js"></script>
+<!-- hanzi-writer: animation nét chữ + quiz viết, load data từng chữ qua CDN -->
+<script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
+<!-- Firebase SDK v9 compat (dùng global compat để không cần bundler) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+:root {
+  --bg:#F7F5F0; --surface:#FFFFFF; --surface2:#F0EDE6; --surface3:#E8E4DA;
+  --border:rgba(0,0,0,0.07); --border2:rgba(0,0,0,0.13);
+  --text:#1C1C18; --text2:#5A5A52; --text3:#96968E;
+  --red:#C0391A; --red-bg:#FAF0EC; --red-dim:#EDD5CA;
+  --blue:#1A5280; --blue-bg:#EBF3FA;
+  --green:#276B32; --green-bg:#E8F5EB;
+  --amber:#7A500A; --amber-bg:#FDF3E0;
+  --purple:#6B3AAA; --purple-bg:#F3EDFC;
+  --r:10px; --rlg:16px;
+  --shadow:0 1px 4px rgba(0,0,0,0.07);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.10);
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#13120F; --surface:#1D1C17; --surface2:#252420; --surface3:#2E2C26;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+    --text:#EEEADF; --text2:#A09A8E; --text3:#64625A;
+    --red:#E05C30; --red-bg:#271410; --red-dim:#3D1E14;
+    --blue:#4A9ED4; --blue-bg:#0C1C2C;
+    --green:#4CAF60; --green-bg:#0C1E10;
+    --amber:#D4A030; --amber-bg:#1C1408;
+    --purple:#A070E0; --purple-bg:#1A1028;
+  }
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;line-height:1.6}
+
+/* ── Layout ── */
+.app{display:flex;min-height:100vh}
+.sidebar{
+  width:200px;min-width:200px;background:var(--surface);
+  border-right:1px solid var(--border2);
+  display:flex;flex-direction:column;
+  position:sticky;top:0;height:100vh;overflow-y:auto;
+  flex-shrink:0;
+}
+.logo{padding:1.4rem 1.1rem 1rem;border-bottom:1px solid var(--border)}
+.logo-zh{font-size:26px;font-weight:700;color:var(--red);letter-spacing:-0.5px}
+.logo-sub{font-size:10.5px;color:var(--text3);margin-top:3px;letter-spacing:0.08em;text-transform:uppercase}
+.nav{padding:.5rem 0;flex:1}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 1.1rem;cursor:pointer;
+  font-size:13.5px;color:var(--text2);
+  transition:all .15s;border-left:2.5px solid transparent;
+  user-select:none;
+}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{color:var(--red);background:var(--red-bg);border-left-color:var(--red);font-weight:500}
+.nav-icon{font-size:17px;width:20px;text-align:center;flex-shrink:0}
+.sidebar-stats{padding:.9rem 1.1rem;border-top:1px solid var(--border);font-size:11.5px;color:var(--text3)}
+.sidebar-stat{display:flex;justify-content:space-between;align-items:center;padding:2px 0}
+.sidebar-stat strong{color:var(--text2);font-weight:600}
+.main{flex:1;min-width:0;overflow-x:hidden}
+.page{display:none;padding:1.75rem 2rem;max-width:940px}
+.page.active{display:block}
+.page-header{margin-bottom:1.6rem}
+.page-title{font-size:21px;font-weight:600;color:var(--text)}
+.page-sub{font-size:13px;color:var(--text3);margin-top:3px}
+
+/* ── Buttons ── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  padding:7px 13px;border-radius:var(--r);
+  border:1px solid var(--border2);background:var(--surface);
+  color:var(--text);font-size:13px;cursor:pointer;
+  transition:all .15s;font-family:inherit;white-space:nowrap;
+}
+.btn:hover{background:var(--surface2)}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--red);color:#fff;border-color:var(--red)}
+.btn-primary:hover{opacity:.87}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-icon{padding:6px;border-radius:8px}
+.btn-green{background:var(--green-bg);color:var(--green);border-color:transparent}
+.btn-green:hover{opacity:.85}
+.btn-wrong{background:var(--red-bg);color:var(--red);border-color:transparent}
+.btn-wrong:hover{background:var(--red-dim)}
+
+/* ── Card ── */
+.card{background:var(--surface);border-radius:var(--rlg);border:1px solid var(--border);padding:1.2rem;box-shadow:var(--shadow)}
+
+/* ── Inputs ── */
+.input-big{
+  flex:1;padding:9px 13px;border-radius:var(--r);
+  border:1px solid var(--border2);background:var(--surface);
+  color:var(--text);font-size:16px;font-family:inherit;
+  outline:none;transition:border-color .15s;width:100%;
+}
+.input-big:focus{border-color:var(--red)}
+.input-big::placeholder{color:var(--text3)}
+.input-sm{
+  flex:1;padding:6px 10px;border-radius:8px;
+  border:1px solid var(--border2);background:var(--surface);
+  color:var(--text);font-size:13px;font-family:inherit;
+  outline:none;transition:border-color .15s;
+}
+.input-sm:focus{border-color:var(--red)}
+
+/* ── Pinyin & Tags ── */
+.py{font-size:13px;color:var(--blue);font-style:italic;line-height:1.4}
+.meaning-txt{font-size:13px;color:var(--text2)}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;margin-right:4px;font-weight:500}
+.tag-new{background:var(--red-bg);color:var(--red)}
+.tag-learning{background:var(--amber-bg);color:var(--amber)}
+.tag-known{background:var(--green-bg);color:var(--green)}
+
+/* ── Word Grid ── */
+.word-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+.wcard{
+  background:var(--surface);border-radius:var(--rlg);
+  border:1px solid var(--border);padding:1rem 1.1rem;
+  transition:box-shadow .15s;
+}
+.wcard:hover{box-shadow:var(--shadow-md)}
+.wcard-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.wcard-zh{font-size:30px;font-weight:700;color:var(--text);line-height:1.2;letter-spacing:1px}
+.wcard-actions{display:flex;gap:3px;flex-shrink:0}
+.wcard-meta{margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+
+/* ── Sentences ── */
+.sentences-wrap{margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
+.sentence-item{
+  margin-bottom:8px;padding:8px 10px;border-radius:8px;
+  background:var(--surface2);
+}
+.sent-zh{font-size:14px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.add-sent-row{display:flex;gap:6px;margin-top:8px}
+
+/* ── Review ── */
+.review-wrap{max-width:500px;margin:0 auto}
+.prog-bar-bg{background:var(--surface3);border-radius:4px;height:5px;margin-bottom:1.2rem}
+.prog-bar{background:var(--red);border-radius:4px;height:5px;transition:width .3s}
+.review-card{
+  background:var(--surface);border-radius:var(--rlg);
+  border:1px solid var(--border2);padding:2.5rem 2rem;
+  text-align:center;min-height:280px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:var(--shadow-md);
+}
+.review-zh{font-size:60px;font-weight:700;line-height:1;margin-bottom:.4rem;letter-spacing:2px}
+.review-reveal{margin-top:1.2rem;animation:fadeIn .3s}
+.review-btns{display:flex;gap:12px;margin-top:1.4rem;justify-content:center}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ── Stroke Quiz ── */
+.stroke-wrap{max-width:520px;margin:0 auto}
+.stroke-card{
+  background:var(--surface);border-radius:var(--rlg);
+  border:1px solid var(--border2);padding:1.5rem;
+  text-align:center;box-shadow:var(--shadow-md);
+}
+#stroke-target{margin:16px auto;border-radius:12px;overflow:hidden;display:block}
+.stroke-info{font-size:13px;color:var(--text3);margin-bottom:8px}
+
+/* ── Done screen ── */
+.done-wrap{text-align:center;padding:3rem 1rem}
+.done-emoji{font-size:60px;margin-bottom:1rem}
+.stats-row{display:flex;gap:14px;justify-content:center;margin:1.5rem 0;flex-wrap:wrap}
+.stat-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.9rem 1.4rem;text-align:center;min-width:90px}
+.stat-num{font-size:28px;font-weight:600}
+.stat-lbl{font-size:11px;color:var(--text3);margin-top:2px}
+
+/* ── Progress page ── */
+.level-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:1.6rem}
+.level-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:1.1rem}
+.level-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.level-card-top{display:flex;align-items:center;gap:7px;margin-bottom:8px}
+.level-count{font-size:30px;font-weight:600;line-height:1}
+.level-pct{font-size:11.5px;color:var(--text3);margin-top:3px}
+.words-table{width:100%;border-collapse:collapse;font-size:13px}
+.words-table th{text-align:left;padding:8px 10px;font-size:11.5px;font-weight:600;color:var(--text3);border-bottom:1px solid var(--border2);background:var(--surface2)}
+.words-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+.words-table tr:last-child td{border-bottom:none}
+.words-table tr:hover td{background:var(--surface2)}
+
+/* ── Mode tabs ── */
+.mode-tabs{display:flex;gap:8px;margin-bottom:1.4rem}
+.mode-tab{
+  padding:7px 16px;border-radius:20px;font-size:13px;cursor:pointer;
+  border:1px solid var(--border2);background:var(--surface);color:var(--text2);
+  transition:all .15s;
+}
+.mode-tab.active{background:var(--red);color:#fff;border-color:var(--red)}
+
+/* ── Search & filter ── */
+.search-row{display:flex;gap:8px;margin-bottom:1.2rem;align-items:center;flex-wrap:wrap}
+.filter-btns{display:flex;gap:4px;flex-wrap:wrap}
+.fbtn{
+  font-size:12px;padding:5px 11px;border-radius:20px;cursor:pointer;
+  border:1px solid var(--border2);background:var(--surface);color:var(--text2);
+  transition:all .15s;
+}
+.fbtn.active{background:var(--red);color:#fff;border-color:var(--red)}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:1.5rem;right:1.5rem;
+  background:var(--text);color:var(--bg);padding:9px 15px;
+  border-radius:var(--r);font-size:13px;z-index:9999;
+  opacity:0;transform:translateY(6px);transition:all .2s;pointer-events:none;
+  max-width:280px;
+}
+.toast.show{opacity:1;transform:translateY(0)}
+
+/* ── Spinner ── */
+.spin{
+  width:15px;height:15px;border:2px solid var(--border2);
+  border-top-color:var(--red);border-radius:50%;
+  animation:spin .6s linear infinite;display:inline-block;vertical-align:middle;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Pinyin ruby (above characters) ── */
+.zh-ruby{display:inline-flex;flex-direction:column;align-items:center;margin:0 1px}
+.zh-ruby .r-py{font-size:11px;color:var(--blue);line-height:1.2}
+.zh-ruby .r-ch{font-size:18px;line-height:1}
+.ruby-wrap{display:inline-flex;flex-wrap:wrap;gap:2px;align-items:flex-end}
+
+/* ── Not-found badge ── */
+.not-found{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:var(--surface3);color:var(--text3)}
+
+/* ── Bottom Tab Bar (mobile) ── */
+.bottom-nav{display:none}
+
+@media(max-width:700px){
+  /* Ẩn sidebar hoàn toàn */
+  .sidebar{display:none}
+
+  /* App chiếm full width */
+  .app{flex-direction:column}
+  .main{width:100%;padding-bottom:72px} /* chừa chỗ cho bottom nav */
+
+  /* Page padding gọn hơn */
+  .page{padding:.9rem 1rem;max-width:100%}
+
+  /* Grid 1 cột */
+  .word-grid{grid-template-columns:1fr}
+  .level-grid{grid-template-columns:1fr 1fr}
+  .stats-row{gap:8px}
+
+  /* Input thêm từ: stack dọc trên màn hình nhỏ */
+  .add-word-row{flex-direction:column}
+
+  /* Table progress: ẩn bớt cột */
+  .words-table .col-hide{display:none}
+
+  /* Review card nhỏ lại */
+  .review-zh{font-size:48px}
+  .review-card{padding:1.5rem 1rem;min-height:220px}
+
+  /* Bottom nav hiện ra */
+  .bottom-nav{
+    display:flex;
+    position:fixed;bottom:0;left:0;right:0;
+    background:var(--surface);
+    border-top:1px solid var(--border2);
+    z-index:1000;
+    padding-bottom:env(safe-area-inset-bottom); /* iPhone notch */
+  }
+  .bnav-item{
+    flex:1;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;padding:8px 4px;
+    cursor:pointer;user-select:none;
+    color:var(--text3);font-size:10.5px;gap:3px;
+    transition:color .15s;border:none;background:none;
+    font-family:inherit;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .bnav-item .bnav-icon{font-size:22px;line-height:1}
+  .bnav-item.active{color:var(--red)}
+  .bnav-item.active .bnav-icon{transform:scale(1.1)}
+
+  /* Header mobile: hiện tên app */
+  .mobile-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:.75rem 1rem;background:var(--surface);
+    border-bottom:1px solid var(--border);
+    position:sticky;top:0;z-index:100;
+  }
+  .mobile-header-title{font-size:18px;font-weight:700;color:var(--red)}
+  .mobile-header-sub{font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase}
+  .mobile-sync-btn{
+    padding:5px 10px;border-radius:8px;border:1px solid var(--border2);
+    background:var(--surface2);font-size:11.5px;cursor:pointer;
+    color:var(--text2);font-family:inherit;
+  }
+}
+
+@media(min-width:701px){
+  .mobile-header{display:none}
+}
+
+/* ── Setup Modal ── */
+.modal-bg{
+  display:none;position:fixed;inset:0;z-index:10000;
+  background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);
+  align-items:center;justify-content:center;padding:1rem;
+}
+.modal-box{
+  background:var(--surface);border-radius:var(--rlg);
+  border:1px solid var(--border2);padding:1.75rem;
+  max-width:480px;width:100%;box-shadow:var(--shadow-md);
+}
+.modal-title{font-size:17px;font-weight:600;margin-bottom:4px}
+.modal-sub{font-size:13px;color:var(--text3);margin-bottom:1.2rem;line-height:1.5}
+.step{display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;font-size:13px}
+.step-num{
+  background:var(--red);color:#fff;border-radius:50%;
+  width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px;
+}
+.step a{color:var(--blue);text-decoration:none}
+.step a:hover{text-decoration:underline}
+.step code{
+  background:var(--surface2);padding:1px 6px;border-radius:4px;
+  font-size:12px;font-family:monospace;color:var(--text);
+}
+
+/* ── Confirm Modal ── */
+.confirm-modal-bg{
+  display:none;position:fixed;inset:0;z-index:10001;
+  background:rgba(0,0,0,0.5);backdrop-filter:blur(3px);
+  align-items:center;justify-content:center;padding:1rem;
+}
+.confirm-box{
+  background:var(--surface);border-radius:var(--rlg);
+  border:1px solid var(--border2);padding:1.5rem;
+  max-width:320px;width:100%;box-shadow:var(--shadow-md);
+  text-align:center;
+}
+.confirm-btns{display:flex;gap:8px;margin-top:1.2rem;justify-content:center}
+</style>
+</head>
+<body>
+<!-- Firebase Setup Modal -->
+<div class="modal-bg" id="setup-modal" onclick="if(event.target===this)closeSetup()">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-title">⚙️ Kết nối Firebase</div>
+    <div class="modal-sub">Chỉ cần copy-paste 1 lần. Sau đó mọi thiết bị dùng chung dữ liệu.</div>
+
+    <div class="step"><div class="step-num">1</div><div>Vào <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> → chọn project → nhấn <strong>⚙️ Project settings</strong> (bánh răng góc trái)</div></div>
+    <div class="step"><div class="step-num">2</div><div>Kéo xuống phần <strong>"Your apps"</strong> → nếu chưa có thì nhấn <strong>&lt;/&gt;</strong> → Register → Continue</div></div>
+    <div class="step"><div class="step-num">3</div><div>Copy toàn bộ đoạn trong <code>firebaseConfig = { ... }</code> rồi paste vào ô bên dưới</div></div>
+
+    <div style="margin:1rem 0">
+      <label style="font-size:12px;font-weight:600;color:var(--text3);display:block;margin-bottom:6px">
+        Paste nội dung <code>firebaseConfig</code> vào đây:
+      </label>
+      <textarea id="fb-config-paste"
+        style="width:100%;height:160px;padding:10px;border-radius:8px;border:1px solid var(--border2);
+               background:var(--surface2);color:var(--text);font-family:monospace;font-size:12px;
+               resize:vertical;outline:none;line-height:1.6"
+        placeholder='apiKey: "AIzaSy...",
+authDomain: "my-app.firebaseapp.com",
+databaseURL: "https://my-app-default-rtdb.firebaseio.com",
+projectId: "my-app-12345",
+storageBucket: "my-app.appspot.com",
+messagingSenderId: "123456789",
+appId: "1:123456789:web:abc123"'></textarea>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">Paste cả nội dung bên trong dấu { } — có hoặc không có dấu ngoặc đều được</div>
+    </div>
+
+    <div id="test-result"></div>
+
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="saveFirebaseConfig()" style="flex:1;justify-content:center;min-width:140px">✓ Lưu & kết nối</button>
+      <button class="btn" onclick="testConnection()" style="min-width:100px">🔍 Test</button>
+      <button class="btn" onclick="closeSetup()">Hủy</button>
+    </div>
+
+    <div style="margin-top:1rem;padding:10px 12px;background:var(--amber-bg);border-radius:8px;font-size:12px;color:var(--amber);line-height:1.5">
+      ⚠ Vào <strong>Realtime Database → Rules</strong> → đảm bảo đang là:
+      <code style="display:block;margin-top:4px;padding:5px 8px;background:rgba(0,0,0,0.1);border-radius:6px;font-size:11px">{"rules":{".read":true,".write":true}}</code>
+      Nếu chưa → xoá hết → paste đoạn trên → <strong>Publish</strong>
+    </div>
+  </div>
+</div>
+<div class="app">
+
+  <!-- Mobile Header (chỉ hiện trên điện thoại) -->
+  <div class="mobile-header" id="mobile-header">
+    <div>
+      <div class="mobile-header-title">汉字本</div>
+      <div class="mobile-header-sub">Chinese Notebook</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div id="mobile-sync-status" style="font-size:11px;color:var(--text3)"></div>
+      <button class="mobile-sync-btn" onclick="openSetup()">⚙️ Sync</button>
+    </div>
+  </div>
+
+  <!-- Sidebar (chỉ hiện trên máy tính) -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-zh">汉字本</div>
+      <div class="logo-sub">Chinese Notebook</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" onclick="showPage('vocab')" data-page="vocab">
+        <span class="nav-icon">📖</span><span>Từ vựng</span>
+      </div>
+      <div class="nav-item" onclick="showPage('review')" data-page="review">
+        <span class="nav-icon">🔄</span><span>Ôn tập</span>
+      </div>
+      <div class="nav-item" onclick="showPage('progress')" data-page="progress">
+        <span class="nav-icon">📊</span><span>Tiến độ</span>
+      </div>
+      <div class="nav-item" onclick="openSetup()" style="margin-top:auto;display:none">
+        <span class="nav-icon">⚙️</span><span>Cài đặt sync</span>
+      </div>
+    </nav>
+    <div class="sidebar-stats">
+      <div class="sidebar-stat"><span>Tổng từ</span><strong id="s-total">0</strong></div>
+      <div class="sidebar-stat"><span>Đã thuộc</span><strong id="s-known">0</strong></div>
+      <div class="sidebar-stat"><span>Đang học</span><strong id="s-learning">0</strong></div>
+      <div class="sidebar-stat"><span>Câu ví dụ</span><strong id="s-sents">0</strong></div>
+      <div id="sync-status" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);line-height:1.5">
+        <span style="color:var(--text3);font-size:11px">Chưa kết nối Firebase</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- ═══ VOCAB PAGE ═══ -->
+    <div class="page active" id="page-vocab">
+      <div class="page-header">
+        <div class="page-title">Từ vựng của tôi</div>
+        <div class="page-sub">Nhập chữ Hán → tự động lấy pinyin + nghĩa tiếng Việt, không cần mạng</div>
+      </div>
+
+      <!-- Add word -->
+      <div class="card" style="margin-bottom:1.4rem">
+        <div style="font-size:12.5px;font-weight:600;color:var(--text3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Thêm từ mới</div>
+        <div style="display:flex;gap:8px">
+          <input class="input-big" id="new-word" placeholder="Nhập chữ Hán… ví dụ: 你好" style="font-size:20px;letter-spacing:2px"
+                 onkeydown="if(event.key==='Enter')addWord()"/>
+          <button class="btn btn-primary" onclick="addWord()" id="add-btn" style="padding:9px 18px;font-size:14px">
+            <span id="add-btn-content">+ Thêm</span>
+          </button>
+        </div>
+        <!-- Preview after lookup -->
+        <div id="add-preview" style="display:none;margin-top:12px;padding:12px;background:var(--surface2);border-radius:var(--r);border:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <div style="font-size:36px;font-weight:700;letter-spacing:2px" id="pv-zh"></div>
+            <div style="flex:1;min-width:160px">
+              <div class="py" style="font-size:15px" id="pv-py"></div>
+              <div class="meaning-txt" style="font-size:14px;margin-top:3px" id="pv-mn"></div>
+              <div id="pv-src" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
+            </div>
+            <button class="btn btn-icon" onclick="speak(document.getElementById('pv-zh').textContent)" title="Nghe phát âm" style="font-size:18px">🔊</button>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="confirmAdd()">✓ Lưu từ này</button>
+            <button class="btn btn-sm" onclick="cancelAdd()">Hủy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search & filter -->
+      <div class="search-row">
+        <input class="input-big" id="search-inp" placeholder="🔍 Tìm từ, pinyin, nghĩa..." oninput="renderVocab()" style="font-size:13.5px;max-width:250px"/>
+        <div class="filter-btns">
+          <button class="fbtn active" onclick="setFilter('all',this)">Tất cả</button>
+          <button class="fbtn" onclick="setFilter('new',this)">Mới</button>
+          <button class="fbtn" onclick="setFilter('learning',this)">Đang học</button>
+          <button class="fbtn" onclick="setFilter('known',this)">Đã thuộc</button>
+        </div>
+      </div>
+
+      <div class="word-grid" id="word-grid"></div>
+    </div>
+
+    <!-- ═══ REVIEW PAGE ═══ -->
+    <div class="page" id="page-review">
+      <div class="page-header">
+        <div class="page-title">Ôn tập</div>
+        <div class="page-sub">Flashcard ghi nhớ và luyện viết nét chữ</div>
+      </div>
+      <div class="mode-tabs">
+        <div class="mode-tab active" onclick="setReviewMode('flash',this)">🃏 Flashcard</div>
+        <div class="mode-tab" onclick="setReviewMode('stroke',this)">✍️ Viết nét chữ</div>
+      </div>
+      <div id="review-content"></div>
+    </div>
+
+    <!-- ═══ PROGRESS PAGE ═══ -->
+    <div class="page" id="page-progress">
+      <div class="page-header">
+        <div class="page-title">Tiến độ học tập</div>
+        <div class="page-sub">Thống kê toàn bộ từ vựng đã lưu</div>
+      </div>
+      <div id="progress-content"></div>
+    </div>
+
+  </main>
+
+  <!-- Bottom Tab Bar (chỉ hiện trên điện thoại) -->
+  <nav class="bottom-nav" id="bottom-nav">
+    <button class="bnav-item active" onclick="showPage('vocab')" data-bpage="vocab">
+      <span class="bnav-icon">📖</span>
+      <span>Từ vựng</span>
+    </button>
+    <button class="bnav-item" onclick="showPage('review')" data-bpage="review">
+      <span class="bnav-icon">🔄</span>
+      <span>Ôn tập</span>
+    </button>
+    <button class="bnav-item" onclick="showPage('progress')" data-bpage="progress">
+      <span class="bnav-icon">📊</span>
+      <span>Tiến độ</span>
+    </button>
+    <button class="bnav-item" id="bnav-setup" style="pointer-events:none;opacity:.6">
+      <span class="bnav-icon" id="bnav-sync-icon">☁</span>
+      <span id="bnav-sync-txt">Sync</span>
+    </button>
+  </nav>
+
+</div>
+<!-- Confirm Modal -->
+<div class="confirm-modal-bg" id="confirm-modal">
+  <div class="confirm-box">
+    <div style="font-size:28px;margin-bottom:.5rem">🗑</div>
+    <div id="confirm-msg" style="font-size:15px;line-height:1.5"></div>
+    <div class="confirm-btns">
+      <button id="confirm-ok" class="btn btn-wrong" style="padding:8px 20px;font-size:14px">Xóa</button>
+      <button id="confirm-cancel" class="btn" style="padding:8px 16px;font-size:14px">Hủy</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+// ═══════════════════════════════════════════════════
+// NGUỒN DỮ LIỆU:
+// 1. DICT (bên dưới) — 298 từ phổ biến, tiếng Việt, offline hoàn toàn
+// 2. pinyin-pro (CDN) — chuyển bất kỳ Hán tự → pinyin có dấu thanh
+// 3. Web Speech API (trình duyệt) — TTS tiếng Trung, không cần internet
+// 4. hanzi-writer (CDN) — animation nét chữ, fetch JSON từng ký tự
+// KHÔNG có Anthropic API, không có bất kỳ API trả phí nào.
+// ═══════════════════════════════════════════════════
+
+// CC-CEDICT subset — 298 entries
+const DICT = {
+  "你": {py:"ni3",en:"you",vn:"bạn/anh/chị"},
+  "我": {py:"wo3",en:"I/me",vn:"tôi/tao"},
+  "他": {py:"ta1",en:"he/him",vn:"anh ấy/hắn"},
+  "她": {py:"ta1",en:"she/her",vn:"cô ấy"},
+  "它": {py:"ta1",en:"it",vn:"nó"},
+  "们": {py:"men5",en:"(plural marker)",vn:"(hậu tố số nhiều)"},
+  "我们": {py:"wo3 men5",en:"we/us",vn:"chúng tôi"},
+  "你们": {py:"ni3 men5",en:"you (plural)",vn:"các bạn"},
+  "他们": {py:"ta1 men5",en:"they/them",vn:"họ"},
+  "的": {py:"de5",en:"(possessive particle)",vn:"(trợ từ sở hữu)"},
+  "了": {py:"le5",en:"(completed action)",vn:"(trợ từ hoàn thành)"},
+  "是": {py:"shi4",en:"to be (is/am/are)",vn:"là"},
+  "不": {py:"bu4",en:"not/no",vn:"không"},
+  "有": {py:"you3",en:"to have",vn:"có"},
+  "在": {py:"zai4",en:"to be at/in",vn:"ở/đang"},
+  "大": {py:"da4",en:"big/large",vn:"to/lớn"},
+  "小": {py:"xiao3",en:"small/little",vn:"nhỏ/bé"},
+  "好": {py:"hao3",en:"good/well",vn:"tốt/hay"},
+  "坏": {py:"huai4",en:"bad",vn:"xấu/hỏng"},
+  "多": {py:"duo1",en:"many/much",vn:"nhiều"},
+  "少": {py:"shao3",en:"few/little",vn:"ít"},
+  "来": {py:"lai2",en:"to come",vn:"đến/lại"},
+  "去": {py:"qu4",en:"to go",vn:"đi"},
+  "吃": {py:"chi1",en:"to eat",vn:"ăn"},
+  "喝": {py:"he1",en:"to drink",vn:"uống"},
+  "说": {py:"shuo1",en:"to say/speak",vn:"nói"},
+  "看": {py:"kan4",en:"to look/watch",vn:"nhìn/xem"},
+  "听": {py:"ting1",en:"to listen",vn:"nghe"},
+  "想": {py:"xiang3",en:"to think/want",vn:"nghĩ/muốn"},
+  "知道": {py:"zhi1 dao5",en:"to know",vn:"biết"},
+  "觉得": {py:"jue2 de5",en:"to feel/think",vn:"cảm thấy"},
+  "喜欢": {py:"xi3 huan5",en:"to like",vn:"thích"},
+  "爱": {py:"ai4",en:"to love",vn:"yêu"},
+  "要": {py:"yao4",en:"to want/need",vn:"muốn/cần"},
+  "可以": {py:"ke3 yi3",en:"can/may",vn:"có thể"},
+  "能": {py:"neng2",en:"can/able",vn:"có thể/được"},
+  "会": {py:"hui4",en:"can/know how",vn:"biết/sẽ"},
+  "应该": {py:"ying1 gai1",en:"should",vn:"nên/phải"},
+  "必须": {py:"bi4 xu1",en:"must",vn:"phải"},
+  "请": {py:"qing3",en:"please/invite",vn:"xin/mời"},
+  "谢谢": {py:"xie4 xie5",en:"thank you",vn:"cảm ơn"},
+  "对不起": {py:"dui4 bu5 qi3",en:"sorry",vn:"xin lỗi"},
+  "没关系": {py:"mei2 guan1 xi5",en:"it's ok",vn:"không sao"},
+  "你好": {py:"ni3 hao3",en:"hello",vn:"xin chào"},
+  "再见": {py:"zai4 jian4",en:"goodbye",vn:"tạm biệt"},
+  "早上好": {py:"zao3 shang5 hao3",en:"good morning",vn:"chào buổi sáng"},
+  "晚上好": {py:"wan3 shang5 hao3",en:"good evening",vn:"chào buổi tối"},
+  "晚安": {py:"wan3 an1",en:"good night",vn:"chúc ngủ ngon"},
+  "中国": {py:"zhong1 guo2",en:"China",vn:"Trung Quốc"},
+  "越南": {py:"yue4 nan2",en:"Vietnam",vn:"Việt Nam"},
+  "日本": {py:"ri4 ben3",en:"Japan",vn:"Nhật Bản"},
+  "美国": {py:"mei3 guo2",en:"USA",vn:"Mỹ"},
+  "英国": {py:"ying1 guo2",en:"UK",vn:"Anh Quốc"},
+  "汉语": {py:"han4 yu3",en:"Chinese language",vn:"tiếng Trung"},
+  "普通话": {py:"pu3 tong1 hua4",en:"Mandarin",vn:"tiếng Phổ thông"},
+  "英语": {py:"ying1 yu3",en:"English",vn:"tiếng Anh"},
+  "学": {py:"xue2",en:"to study",vn:"học"},
+  "学习": {py:"xue2 xi2",en:"to study/learn",vn:"học tập"},
+  "学生": {py:"xue2 sheng1",en:"student",vn:"học sinh"},
+  "老师": {py:"lao3 shi1",en:"teacher",vn:"giáo viên"},
+  "朋友": {py:"peng2 you5",en:"friend",vn:"bạn bè"},
+  "家": {py:"jia1",en:"home/family",vn:"nhà/gia đình"},
+  "父母": {py:"fu4 mu3",en:"parents",vn:"cha mẹ"},
+  "爸爸": {py:"ba4 ba5",en:"dad",vn:"bố/ba"},
+  "妈妈": {py:"ma1 ma5",en:"mom",vn:"mẹ/má"},
+  "哥哥": {py:"ge1 ge5",en:"older brother",vn:"anh trai"},
+  "姐姐": {py:"jie3 jie5",en:"older sister",vn:"chị gái"},
+  "弟弟": {py:"di4 di5",en:"younger brother",vn:"em trai"},
+  "妹妹": {py:"mei4 mei5",en:"younger sister",vn:"em gái"},
+  "男朋友": {py:"nan2 peng2 you5",en:"boyfriend",vn:"bạn trai"},
+  "女朋友": {py:"nv3 peng2 you5",en:"girlfriend",vn:"bạn gái"},
+  "工作": {py:"gong1 zuo4",en:"work/job",vn:"công việc/làm việc"},
+  "公司": {py:"gong1 si1",en:"company",vn:"công ty"},
+  "钱": {py:"qian2",en:"money",vn:"tiền"},
+  "时间": {py:"shi2 jian1",en:"time",vn:"thời gian"},
+  "今天": {py:"jin1 tian1",en:"today",vn:"hôm nay"},
+  "明天": {py:"ming2 tian1",en:"tomorrow",vn:"ngày mai"},
+  "昨天": {py:"zuo2 tian1",en:"yesterday",vn:"hôm qua"},
+  "年": {py:"nian2",en:"year",vn:"năm"},
+  "月": {py:"yue4",en:"month/moon",vn:"tháng/mặt trăng"},
+  "日": {py:"ri4",en:"day/sun",vn:"ngày/mặt trời"},
+  "星期": {py:"xing1 qi1",en:"week",vn:"tuần"},
+  "号": {py:"hao4",en:"number/date",vn:"số/ngày"},
+  "现在": {py:"xian4 zai4",en:"now",vn:"bây giờ"},
+  "以前": {py:"yi3 qian2",en:"before/previously",vn:"trước đây"},
+  "以后": {py:"yi3 hou4",en:"after/later",vn:"sau này"},
+  "还是": {py:"hai2 shi5",en:"or/still",vn:"hay là/vẫn còn"},
+  "但是": {py:"dan4 shi5",en:"but",vn:"nhưng"},
+  "因为": {py:"yin1 wei4",en:"because",vn:"vì/bởi vì"},
+  "所以": {py:"suo3 yi3",en:"therefore",vn:"vì vậy"},
+  "如果": {py:"ru2 guo3",en:"if",vn:"nếu"},
+  "虽然": {py:"sui1 ran2",en:"although",vn:"mặc dù"},
+  "一": {py:"yi1",en:"one",vn:"một"},
+  "二": {py:"er4",en:"two",vn:"hai"},
+  "三": {py:"san1",en:"three",vn:"ba"},
+  "四": {py:"si4",en:"four",vn:"bốn"},
+  "五": {py:"wu3",en:"five",vn:"năm"},
+  "六": {py:"liu4",en:"six",vn:"sáu"},
+  "七": {py:"qi1",en:"seven",vn:"bảy"},
+  "八": {py:"ba1",en:"eight",vn:"tám"},
+  "九": {py:"jiu3",en:"nine",vn:"chín"},
+  "十": {py:"shi2",en:"ten",vn:"mười"},
+  "百": {py:"bai3",en:"hundred",vn:"trăm"},
+  "千": {py:"qian1",en:"thousand",vn:"nghìn"},
+  "万": {py:"wan4",en:"ten thousand",vn:"vạn"},
+  "第一": {py:"di4 yi1",en:"first",vn:"thứ nhất"},
+  "第二": {py:"di4 er4",en:"second",vn:"thứ hai"},
+  "这": {py:"zhe4",en:"this",vn:"cái này/đây"},
+  "那": {py:"na4",en:"that",vn:"cái kia/đó"},
+  "哪": {py:"na3",en:"which",vn:"nào/đâu"},
+  "什么": {py:"shen2 me5",en:"what",vn:"cái gì/gì"},
+  "谁": {py:"shei2",en:"who",vn:"ai"},
+  "哪里": {py:"na3 li5",en:"where",vn:"ở đâu"},
+  "为什么": {py:"wei4 shen2 me5",en:"why",vn:"tại sao"},
+  "怎么": {py:"zen3 me5",en:"how",vn:"như thế nào"},
+  "几": {py:"ji3",en:"how many",vn:"mấy/bao nhiêu"},
+  "多少": {py:"duo1 shao3",en:"how much",vn:"bao nhiêu"},
+  "很": {py:"hen3",en:"very",vn:"rất"},
+  "太": {py:"tai4",en:"too/extremely",vn:"quá"},
+  "非常": {py:"fei1 chang2",en:"very/extremely",vn:"rất/vô cùng"},
+  "真的": {py:"zhen1 de5",en:"really",vn:"thật sự"},
+  "还": {py:"hai2",en:"still/also",vn:"vẫn/còn"},
+  "也": {py:"ye3",en:"also/too",vn:"cũng"},
+  "都": {py:"dou1",en:"all/both",vn:"đều/tất cả"},
+  "只": {py:"zhi3",en:"only/just",vn:"chỉ"},
+  "就": {py:"jiu4",en:"then/just",vn:"thì/ngay"},
+  "已经": {py:"yi3 jing1",en:"already",vn:"đã rồi"},
+  "马上": {py:"ma3 shang4",en:"immediately",vn:"ngay lập tức"},
+  "吃饭": {py:"chi1 fan4",en:"to eat (meal)",vn:"ăn cơm"},
+  "喝水": {py:"he1 shui3",en:"to drink water",vn:"uống nước"},
+  "睡觉": {py:"shui4 jiao4",en:"to sleep",vn:"ngủ"},
+  "起床": {py:"qi3 chuang2",en:"to get up",vn:"dậy/thức dậy"},
+  "回家": {py:"hui2 jia1",en:"to go home",vn:"về nhà"},
+  "上班": {py:"shang4 ban1",en:"to go to work",vn:"đi làm"},
+  "下班": {py:"xia4 ban1",en:"to finish work",vn:"tan ca/tan làm"},
+  "买": {py:"mai3",en:"to buy",vn:"mua"},
+  "卖": {py:"mai4",en:"to sell",vn:"bán"},
+  "用": {py:"yong4",en:"to use",vn:"dùng/sử dụng"},
+  "给": {py:"gei3",en:"to give",vn:"cho/đưa"},
+  "叫": {py:"jiao4",en:"to call/named",vn:"gọi là/tên là"},
+  "问": {py:"wen4",en:"to ask",vn:"hỏi"},
+  "回答": {py:"hui2 da2",en:"to answer",vn:"trả lời"},
+  "找": {py:"zhao3",en:"to look for",vn:"tìm"},
+  "等": {py:"deng3",en:"to wait",vn:"đợi/chờ"},
+  "开始": {py:"kai1 shi3",en:"to start",vn:"bắt đầu"},
+  "结束": {py:"jie2 shu4",en:"to end",vn:"kết thúc"},
+  "完成": {py:"wan2 cheng2",en:"to complete",vn:"hoàn thành"},
+  "帮助": {py:"bang1 zhu4",en:"to help",vn:"giúp đỡ"},
+  "使用": {py:"shi3 yong4",en:"to use",vn:"sử dụng"},
+  "保护": {py:"bao3 hu4",en:"to protect",vn:"bảo vệ"},
+  "发展": {py:"fa1 zhan3",en:"to develop",vn:"phát triển"},
+  "成功": {py:"cheng2 gong1",en:"success",vn:"thành công"},
+  "失败": {py:"shi1 bai4",en:"failure",vn:"thất bại"},
+  "问题": {py:"wen4 ti2",en:"problem/question",vn:"vấn đề/câu hỏi"},
+  "答案": {py:"da2 an4",en:"answer",vn:"câu trả lời"},
+  "方法": {py:"fang1 fa3",en:"method",vn:"phương pháp"},
+  "原因": {py:"yuan2 yin1",en:"reason",vn:"lý do/nguyên nhân"},
+  "结果": {py:"jie2 guo3",en:"result",vn:"kết quả"},
+  "情况": {py:"qing2 kuang4",en:"situation",vn:"tình huống"},
+  "关系": {py:"guan1 xi5",en:"relationship",vn:"quan hệ"},
+  "文化": {py:"wen2 hua4",en:"culture",vn:"văn hóa"},
+  "历史": {py:"li4 shi3",en:"history",vn:"lịch sử"},
+  "科学": {py:"ke1 xue2",en:"science",vn:"khoa học"},
+  "技术": {py:"ji4 shu4",en:"technology",vn:"công nghệ"},
+  "医院": {py:"yi1 yuan4",en:"hospital",vn:"bệnh viện"},
+  "学校": {py:"xue2 xiao4",en:"school",vn:"trường học"},
+  "图书馆": {py:"tu2 shu1 guan3",en:"library",vn:"thư viện"},
+  "商店": {py:"shang1 dian4",en:"shop/store",vn:"cửa hàng"},
+  "餐厅": {py:"can1 ting1",en:"restaurant",vn:"nhà hàng"},
+  "银行": {py:"yin2 hang2",en:"bank",vn:"ngân hàng"},
+  "机场": {py:"ji1 chang3",en:"airport",vn:"sân bay"},
+  "火车站": {py:"huo3 che1 zhan4",en:"train station",vn:"ga tàu hỏa"},
+  "地铁": {py:"di4 tie3",en:"subway/metro",vn:"tàu điện ngầm"},
+  "汽车": {py:"qi4 che1",en:"car/automobile",vn:"xe ô tô"},
+  "飞机": {py:"fei1 ji1",en:"airplane",vn:"máy bay"},
+  "手机": {py:"shou3 ji1",en:"mobile phone",vn:"điện thoại di động"},
+  "电脑": {py:"dian4 nao3",en:"computer",vn:"máy tính"},
+  "网络": {py:"wang3 luo4",en:"internet/network",vn:"mạng internet"},
+  "照片": {py:"zhao4 pian4",en:"photo",vn:"ảnh chụp"},
+  "音乐": {py:"yin1 yue4",en:"music",vn:"âm nhạc"},
+  "电影": {py:"dian4 ying3",en:"movie",vn:"phim"},
+  "书": {py:"shu1",en:"book",vn:"sách"},
+  "报纸": {py:"bao4 zhi3",en:"newspaper",vn:"báo"},
+  "天气": {py:"tian1 qi4",en:"weather",vn:"thời tiết"},
+  "温度": {py:"wen1 du4",en:"temperature",vn:"nhiệt độ"},
+  "水": {py:"shui3",en:"water",vn:"nước"},
+  "火": {py:"huo3",en:"fire",vn:"lửa"},
+  "风": {py:"feng1",en:"wind",vn:"gió"},
+  "雨": {py:"yu3",en:"rain",vn:"mưa"},
+  "雪": {py:"xue3",en:"snow",vn:"tuyết"},
+  "太阳": {py:"tai4 yang2",en:"sun",vn:"mặt trời"},
+  "月亮": {py:"yue4 liang4",en:"moon",vn:"mặt trăng"},
+  "星星": {py:"xing1 xing5",en:"stars",vn:"ngôi sao"},
+  "山": {py:"shan1",en:"mountain",vn:"núi"},
+  "河": {py:"he2",en:"river",vn:"sông"},
+  "海": {py:"hai3",en:"sea/ocean",vn:"biển"},
+  "树": {py:"shu4",en:"tree",vn:"cây"},
+  "花": {py:"hua1",en:"flower",vn:"hoa"},
+  "草": {py:"cao3",en:"grass",vn:"cỏ"},
+  "猫": {py:"mao1",en:"cat",vn:"mèo"},
+  "狗": {py:"gou3",en:"dog",vn:"chó"},
+  "鱼": {py:"yu2",en:"fish",vn:"cá"},
+  "鸟": {py:"niao3",en:"bird",vn:"chim"},
+  "米饭": {py:"mi3 fan4",en:"cooked rice",vn:"cơm"},
+  "面条": {py:"mian4 tiao2",en:"noodles",vn:"mì/bún"},
+  "面包": {py:"mian4 bao1",en:"bread",vn:"bánh mì"},
+  "蔬菜": {py:"shu1 cai4",en:"vegetables",vn:"rau củ"},
+  "水果": {py:"shui3 guo3",en:"fruit",vn:"hoa quả"},
+  "肉": {py:"rou4",en:"meat",vn:"thịt"},
+  "鸡肉": {py:"ji1 rou4",en:"chicken",vn:"thịt gà"},
+  "猪肉": {py:"zhu1 rou4",en:"pork",vn:"thịt lợn"},
+  "牛奶": {py:"niu2 nai3",en:"milk",vn:"sữa"},
+  "茶": {py:"cha2",en:"tea",vn:"trà/chè"},
+  "咖啡": {py:"ka1 fei1",en:"coffee",vn:"cà phê"},
+  "啤酒": {py:"pi2 jiu3",en:"beer",vn:"bia"},
+  "衣服": {py:"yi1 fu5",en:"clothes",vn:"quần áo"},
+  "上衣": {py:"shang4 yi1",en:"top/shirt",vn:"áo"},
+  "裤子": {py:"ku4 zi5",en:"pants/trousers",vn:"quần"},
+  "鞋": {py:"xie2",en:"shoes",vn:"giày dép"},
+  "红色": {py:"hong2 se4",en:"red",vn:"màu đỏ"},
+  "蓝色": {py:"lan2 se4",en:"blue",vn:"màu xanh dương"},
+  "绿色": {py:"lv4 se4",en:"green",vn:"màu xanh lá"},
+  "黄色": {py:"huang2 se4",en:"yellow",vn:"màu vàng"},
+  "白色": {py:"bai2 se4",en:"white",vn:"màu trắng"},
+  "黑色": {py:"hei1 se4",en:"black",vn:"màu đen"},
+  "高兴": {py:"gao1 xing4",en:"happy",vn:"vui mừng"},
+  "快乐": {py:"kuai4 le4",en:"happy/joyful",vn:"hạnh phúc/vui vẻ"},
+  "高兴": {py:"gao1 xing4",en:"glad/happy",vn:"vui/mừng"},
+  "难过": {py:"nan2 guo4",en:"sad",vn:"buồn"},
+  "生气": {py:"sheng1 qi4",en:"angry",vn:"tức giận"},
+  "害怕": {py:"hai4 pa4",en:"afraid/scared",vn:"sợ hãi"},
+  "担心": {py:"dan1 xin1",en:"worried",vn:"lo lắng"},
+  "累": {py:"lei4",en:"tired",vn:"mệt"},
+  "饿": {py:"e4",en:"hungry",vn:"đói"},
+  "渴": {py:"ke3",en:"thirsty",vn:"khát"},
+  "健康": {py:"jian4 kang1",en:"healthy",vn:"khỏe mạnh"},
+  "漂亮": {py:"piao4 liang5",en:"pretty/beautiful",vn:"đẹp/xinh"},
+  "帅": {py:"shuai4",en:"handsome",vn:"đẹp trai/điển trai"},
+  "聪明": {py:"cong1 ming5",en:"smart/intelligent",vn:"thông minh"},
+  "努力": {py:"nu3 li4",en:"hardworking",vn:"chăm chỉ/nỗ lực"},
+  "有趣": {py:"you3 qu4",en:"interesting",vn:"thú vị"},
+  "容易": {py:"rong2 yi4",en:"easy",vn:"dễ"},
+  "难": {py:"nan2",en:"difficult",vn:"khó"},
+  "快": {py:"kuai4",en:"fast",vn:"nhanh"},
+  "慢": {py:"man4",en:"slow",vn:"chậm"},
+  "新": {py:"xin1",en:"new",vn:"mới"},
+  "旧": {py:"jiu4",en:"old/used",vn:"cũ"},
+  "长": {py:"chang2",en:"long",vn:"dài"},
+  "短": {py:"duan3",en:"short",vn:"ngắn"},
+  "高": {py:"gao1",en:"tall/high",vn:"cao"},
+  "矮": {py:"ai3",en:"short/low",vn:"thấp/lùn"},
+  "胖": {py:"pang4",en:"fat",vn:"béo"},
+  "瘦": {py:"shou4",en:"thin/slim",vn:"gầy/mỏng"},
+  "早": {py:"zao3",en:"early/morning",vn:"sớm/buổi sáng"},
+  "晚": {py:"wan3",en:"late/evening",vn:"muộn/buổi tối"},
+  "左": {py:"zuo3",en:"left",vn:"trái"},
+  "右": {py:"you4",en:"right",vn:"phải"},
+  "上": {py:"shang4",en:"up/on/above",vn:"trên"},
+  "下": {py:"xia4",en:"down/under",vn:"dưới"},
+  "里": {py:"li3",en:"inside",vn:"trong"},
+  "外": {py:"wai4",en:"outside",vn:"ngoài"},
+  "前": {py:"qian2",en:"front/before",vn:"trước"},
+  "后": {py:"hou4",en:"back/after",vn:"sau"},
+  "中": {py:"zhong1",en:"middle/center",vn:"giữa/trung"},
+  "门": {py:"men2",en:"door",vn:"cửa"},
+  "窗户": {py:"chuang1 hu4",en:"window",vn:"cửa sổ"},
+  "桌子": {py:"zhuo1 zi5",en:"table",vn:"bàn"},
+  "椅子": {py:"yi3 zi5",en:"chair",vn:"ghế"},
+  "床": {py:"chuang2",en:"bed",vn:"giường"},
+  "房间": {py:"fang2 jian1",en:"room",vn:"phòng"},
+  "厨房": {py:"chu2 fang2",en:"kitchen",vn:"bếp"},
+  "洗手间": {py:"xi3 shou3 jian1",en:"bathroom/toilet",vn:"nhà vệ sinh"},
+  "笔": {py:"bi3",en:"pen",vn:"bút"},
+  "纸": {py:"zhi3",en:"paper",vn:"giấy"},
+  "电话": {py:"dian4 hua4",en:"telephone",vn:"điện thoại"},
+  "钥匙": {py:"yao4 shi5",en:"key",vn:"chìa khóa"},
+  "地方": {py:"di4 fang5",en:"place",vn:"địa điểm/nơi"},
+  "城市": {py:"cheng2 shi4",en:"city",vn:"thành phố"},
+  "国家": {py:"guo2 jia1",en:"country",vn:"đất nước/quốc gia"},
+  "世界": {py:"shi4 jie4",en:"world",vn:"thế giới"},
+  "人": {py:"ren2",en:"person/people",vn:"người"},
+  "男人": {py:"nan2 ren2",en:"man",vn:"đàn ông"},
+  "女人": {py:"nv3 ren2",en:"woman",vn:"phụ nữ"},
+  "孩子": {py:"hai2 zi5",en:"child",vn:"trẻ em/đứa bé"},
+  "大人": {py:"da4 ren2",en:"adult",vn:"người lớn"},
+  "年龄": {py:"nian2 ling2",en:"age",vn:"tuổi"},
+  "名字": {py:"ming2 zi5",en:"name",vn:"tên"},
+  "语言": {py:"yu3 yan2",en:"language",vn:"ngôn ngữ"},
+  "句子": {py:"ju4 zi5",en:"sentence",vn:"câu"},
+  "词": {py:"ci2",en:"word",vn:"từ"},
+  "意思": {py:"yi4 si5",en:"meaning",vn:"ý nghĩa"},
+  "翻译": {py:"fan1 yi4",en:"translate",vn:"dịch"},
+  "声调": {py:"sheng1 diao4",en:"tone (of Chinese)",vn:"thanh điệu"},
+  "拼音": {py:"pin1 yin1",en:"pinyin",vn:"phiên âm pinyin"},
+  "汉字": {py:"han4 zi4",en:"Chinese character",vn:"chữ Hán"},
+  "复习": {py:"fu4 xi2",en:"to review/revise",vn:"ôn tập"},
+  "练习": {py:"lian4 xi2",en:"to practice",vn:"luyện tập"},
+  "进步": {py:"jin4 bu4",en:"progress/improve",vn:"tiến bộ"},
+};
+// Total: 298 entries
+
+// ── pinyin-pro helper (loads from CDN, runs client-side after that) ──
+function getPinyin(zh) {
+  if (typeof pinyinPro === 'undefined') return zh;
+  const { pinyin } = pinyinPro;
+  return pinyin(zh, { toneType: 'symbol', type: 'string' });
+}
+
+// ── Dict lookup: tra nghĩa tiếng Việt từ DICT nội bộ ──
+function lookupWord(zh) {
+  // Tra chính xác
+  if (DICT[zh]) {
+    const d = DICT[zh];
+    return {
+      pinyin: getPinyin(zh),       // dùng pinyin-pro cho dấu thanh đẹp
+      pinyinNum: d.py,             // lưu dạng số để tra dict
+      meaning: d.vn,               // nghĩa tiếng Việt
+      meaningEn: d.en,             // nghĩa tiếng Anh
+      source: 'dict',              // có trong từ điển
+    };
+  }
+  // Không có trong dict → vẫn lấy pinyin từ pinyin-pro
+  return {
+    pinyin: getPinyin(zh),
+    pinyinNum: '',
+    meaning: '',                   // không có nghĩa TV
+    meaningEn: '',
+    source: 'pinyin-only',         // chỉ có pinyin, không có nghĩa
+  };
+}
+
+// Lấy pinyin cho cả câu (pinyin-pro xử lý từng chữ)
+function getSentencePinyin(zh) {
+  if (typeof pinyinPro === 'undefined') return '';
+  const { pinyin } = pinyinPro;
+  return pinyin(zh, { toneType: 'symbol', type: 'string', separator: ' ' });
+}
+
+// ── TTS — Web Speech API của trình duyệt ──
+function speak(text) {
+  if (!('speechSynthesis' in window)) { showToast('Trình duyệt không hỗ trợ phát âm'); return; }
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN';
+  u.rate = 0.82;
+  u.pitch = 1;
+  // Ưu tiên giọng zh-CN nếu có
+  const voices = window.speechSynthesis.getVoices();
+  const zhVoice = voices.find(v => v.lang.startsWith('zh'));
+  if (zhVoice) u.voice = zhVoice;
+  window.speechSynthesis.speak(u);
+}
+// Preload voices (cần cho một số trình duyệt)
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
+
+// ══════════════════════════════════════════════════
+// FIREBASE SDK SYNC (dùng SDK chính thức, xử lý CORS tự động)
+// ══════════════════════════════════════════════════
+
+// ── DB object ──
+const DB = {
+  words: JSON.parse(localStorage.getItem('zh_nb_v2') || '[]'),
+  save() {
+    localStorage.setItem('zh_nb_v2', JSON.stringify(this.words));
+    fbSave();
+  },
+  add(w)  { this.words.unshift(w); this.save(); },
+  update(id, patch) {
+    const i = this.words.findIndex(w => w.id === id);
+    if (i > -1) { Object.assign(this.words[i], patch); this.save(); }
+  },
+  remove(id) { this.words = this.words.filter(w => w.id !== id); this.save(); },
+  get(id)    { return this.words.find(w => w.id === id); },
+};
+
+// ── Firebase config (baked in) ──
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyBMPxV1svqWmavEB8CTYHasNFCE8zg51bI",
+  authDomain:        "appnote-8e4ed.firebaseapp.com",
+  databaseURL:       "https://appnote-8e4ed-default-rtdb.firebaseio.com",
+  projectId:         "appnote-8e4ed",
+  storageBucket:     "appnote-8e4ed.firebasestorage.app",
+  messagingSenderId: "673175255834",
+  appId:             "1:673175255834:web:0fcaba3628646217948aa3"
+};
+
+// ── Firebase state ──
+let _fbApp    = null;
+let _fbDb     = null;
+let _fbRef    = null;
+let _fbTimer  = null;
+let _fbInited = false;
+
+function getSavedConfig() { return FIREBASE_CONFIG; }
+
+// ── Khởi động Firebase SDK ──
+async function initCloud() {
+  renderVocab();
+  updateStats();
+  showSyncStatus('connecting');
+
+  try {
+    if (!_fbInited) {
+      _fbApp    = firebase.apps.length > 0
+                  ? firebase.apps[0]
+                  : firebase.initializeApp(FIREBASE_CONFIG);
+      _fbDb     = firebase.database(_fbApp);
+      _fbRef    = _fbDb.ref('hanzi_notebook');
+      _fbInited = true;
+    }
+
+    // Đọc 1 lần khi khởi động
+    const snap      = await _fbRef.get();
+    const cloudData = snap.val();
+
+    if (cloudData && Array.isArray(cloudData.words) && cloudData.words.length > 0) {
+      DB.words = mergeWords(DB.words, cloudData.words);
+      localStorage.setItem('zh_nb_v2', JSON.stringify(DB.words));
+      renderVocab();
+      updateStats();
+    } else if (DB.words.length > 0) {
+      await fbPush();
+    }
+
+    // Realtime listener — tự cập nhật khi thiết bị khác thay đổi
+    _fbRef.on('value', (snap) => {
+      const data = snap.val();
+      if (!data || !Array.isArray(data.words)) return;
+      const cloudIds = JSON.stringify([...data.words.map(w => w.id)].sort());
+      const localIds = JSON.stringify([...DB.words.map(w => w.id)].sort());
+      if (cloudIds !== localIds) {
+        DB.words = mergeWords(DB.words, data.words);
+        localStorage.setItem('zh_nb_v2', JSON.stringify(DB.words));
+        renderVocab();
+        updateStats();
+      }
+      showSyncStatus('ok');
+    });
+
+    showSyncStatus('ok');
+  } catch(e) {
+    console.error('[Firebase]', e);
+    const msg = e.message || String(e);
+    if (msg.includes('permission') || msg.includes('PERMISSION')) {
+      showSyncStatus('error', 'Lỗi quyền — vào Firebase Console → Realtime Database → Rules → read/write: true → Publish');
+    } else {
+      showSyncStatus('error', msg.substring(0, 150));
+    }
+  }
+}
+
+// Gộp 2 mảng từ theo id, cloud thắng khi trùng
+function mergeWords(local, cloud) {
+  const map = new Map();
+  local.forEach(w => map.set(w.id, w));
+  cloud.forEach(w => map.set(w.id, w));
+  return Array.from(map.values()).sort((a, b) => b.id - a.id);
+}
+
+// ── Ghi lên Firebase (debounce 1.5s) ──
+function fbSave() {
+  if (!_fbRef) return;
+  clearTimeout(_fbTimer);
+  showSyncStatus('saving');
+  _fbTimer = setTimeout(fbPush, 1500);
+}
+
+async function fbPush() {
+  if (!_fbRef) return;
+  try {
+    await _fbRef.set({ words: DB.words, updatedAt: Date.now() });
+    showSyncStatus('ok');
+  } catch(e) {
+    console.error('[Firebase] write error:', e);
+    showSyncStatus('error', e.message?.substring(0, 120));
+  }
+}
+
+// ── Trạng thái sync ──
+function showSyncStatus(state, detail) {
+  const map = {
+    setup:      { icon:'⚙️', text:'Chưa cài Firebase',  color:'var(--amber)',  bicon:'⚙️', btxt:'Sync' },
+    connecting: { icon:'⟳',  text:'Đang kết nối…',      color:'var(--text3)', bicon:'⟳',  btxt:'Sync' },
+    saving:     { icon:'⟳',  text:'Đang lưu…',           color:'var(--amber)', bicon:'⟳',  btxt:'Lưu…' },
+    ok:         { icon:'☁',  text:'Đã đồng bộ',          color:'var(--green)', bicon:'☁',  btxt:'Sync' },
+    error:      { icon:'⚠',  text:'Lỗi kết nối',         color:'var(--red)',   bicon:'⚠',  btxt:'Lỗi'  },
+  };
+  const s = map[state] || map.ok;
+
+  // Sidebar (desktop)
+  const el = document.getElementById('sync-status');
+  if (el) {
+    const detailHtml = detail
+      ? `<div style="font-size:10px;opacity:.8;margin-top:3px;line-height:1.4;word-break:break-word">${detail}</div>`
+      : '';
+    const setupBtn = state === 'setup' || state === 'error'
+      ? `<button onclick="openSetup()" style="margin-top:5px;display:block;font-size:10.5px;padding:3px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--surface);cursor:pointer;color:var(--text2)">⚙️ Cài đặt lại</button>`
+      : '';
+    el.innerHTML = `<span style="color:${s.color};font-size:11px;line-height:1.4">${s.icon} ${s.text}</span>${detailHtml}${setupBtn}`;
+  }
+
+  // Mobile header
+  const mel = document.getElementById('mobile-sync-status');
+  if (mel) mel.innerHTML = `<span style="color:${s.color}">${s.icon} ${s.text}</span>`;
+
+  // Bottom nav sync tab
+  const bicon = document.getElementById('bnav-sync-icon');
+  const btxt  = document.getElementById('bnav-sync-txt');
+  if (bicon) { bicon.textContent = s.bicon; bicon.style.color = s.color; }
+  if (btxt)  { btxt.textContent  = s.btxt;  btxt.style.color  = s.color; }
+}
+
+// ── Setup Firebase ──
+function openSetup() {
+  document.getElementById('setup-modal').style.display = 'flex';
+  const cfg = getSavedConfig();
+  if (cfg) {
+    // Hiện lại config dạng text để user xem/sửa
+    const lines = Object.entries(cfg)
+      .map(([k,v]) => `${k}: "${v}"`)
+      .join(',
+');
+    document.getElementById('fb-config-paste').value = lines;
+  }
+  const tr = document.getElementById('test-result');
+  if (tr) tr.innerHTML = '';
+}
+
+function closeSetup() {
+  document.getElementById('setup-modal').style.display = 'none';
+}
+
+// Parse đoạn firebaseConfig paste vào — chấp nhận nhiều format
+function parseFirebaseConfig(raw) {
+  // Bỏ "const firebaseConfig = " và dấu ngoặc ngoài nếu có
+  let text = raw.trim();
+  text = text.replace(/^const\s+\w+\s*=\s*/, '');
+  text = text.replace(/^var\s+\w+\s*=\s*/, '');
+  text = text.replace(/^let\s+\w+\s*=\s*/, '');
+  // Thêm dấu ngoặc nếu chưa có
+  if (!text.startsWith('{')) text = '{' + text;
+  if (!text.endsWith('}') && !text.endsWith('};')) text = text + '}';
+  text = text.replace(/};$/, '}');
+  // Thêm dấu nháy vào keys (biến JS object thành JSON)
+  text = text.replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
+  // Thay nháy đơn thành nháy đôi
+  text = text.replace(/'/g, '"');
+  // Xoá trailing comma trước }
+  text = text.replace(/,\s*}/g, '}');
+  try {
+    return JSON.parse(text);
+  } catch(e) {
+    return null;
+  }
+}
+
+function getFormConfig() {
+  const raw = document.getElementById('fb-config-paste').value.trim();
+  if (!raw) return null;
+  return parseFirebaseConfig(raw);
+}
+
+async function testConnection() {
+  const cfg = getFormConfig();
+  if (!cfg) {
+    showTestResult('error', '❌ Không đọc được config — hãy copy đúng nội dung trong dấu { } từ Firebase Console'); return;
+  }
+  if (!cfg.databaseURL) {
+    showTestResult('error', '❌ Thiếu databaseURL — đảm bảo đã tạo Realtime Database và copy đúng config'); return;
+  }
+  showTestResult('loading', '⟳ Đang test kết nối...');
+  try {
+    const url = cfg.databaseURL.replace(/\/+$/, '') + '/hanzi_notebook.json';
+    const res  = await fetch(url, { cache: 'no-store' });
+    if (res.status === 403) {
+      showTestResult('error', '❌ Lỗi 403: Vào Realtime Database → Rules → đặt read/write: true → Publish');
+    } else if (res.ok || res.status === 200) {
+      showTestResult('ok', '✅ Kết nối thành công! Nhấn Lưu & kết nối.');
+    } else {
+      showTestResult('error', `❌ HTTP ${res.status} — kiểm tra lại config`);
+    }
+  } catch(e) {
+    showTestResult('error', `❌ ${e.message}`);
+  }
+}
+
+function showTestResult(type, msg) {
+  const tr = document.getElementById('test-result');
+  if (!tr) return;
+  const color = type === 'ok' ? 'var(--green)' : type === 'error' ? 'var(--red)' : 'var(--text3)';
+  tr.innerHTML = `<div style="font-size:12px;color:${color};margin-top:8px;line-height:1.5">${msg}</div>`;
+}
+
+async function saveFirebaseConfig() {
+  const cfg = getFormConfig();
+  if (!cfg) {
+    showToast('Không đọc được config — kiểm tra lại định dạng'); return;
+  }
+  if (!cfg.apiKey) { showToast('Thiếu apiKey trong config'); return; }
+  if (!cfg.databaseURL || !cfg.databaseURL.includes('firebaseio.com')) {
+    showToast('Thiếu databaseURL hoặc chưa tạo Realtime Database'); return;
+  }
+  if (!cfg.projectId) { showToast('Thiếu projectId trong config'); return; }
+
+  // Reset Firebase nếu đã init
+  if (_fbInited && _fbRef) { try { _fbRef.off(); } catch(e){} }
+  _fbInited = false; _fbApp = null; _fbDb = null; _fbRef = null;
+
+  localStorage.setItem('zh_fb_config', JSON.stringify(cfg));
+  localStorage.removeItem('zh_fb_url');
+
+  closeSetup();
+  showToast('Đã lưu! Đang kết nối…');
+  await initCloud();
+}
+
+// ── State ──
+let currentFilter = 'all';
+let pendingWord   = null;
+let reviewQueue   = [];
+let reviewIdx     = 0;
+let reviewScore   = { right: 0, wrong: 0 };
+let reviewMode    = 'flash';  // 'flash' | 'stroke'
+let hanziWriter   = null;
+
+// ══════════════════════════════════════════════════
+// VOCAB PAGE
+// ══════════════════════════════════════════════════
+async function addWord() {
+  const inp = document.getElementById('new-word');
+  const zh  = inp.value.trim();
+  if (!zh) { showToast('Nhập chữ Hán trước nhé!'); return; }
+
+  // Kiểm tra trùng lặp
+  const existing = DB.words.find(w => w.zh === zh);
+  if (existing) {
+    showToast(`"${zh}" đã có trong danh sách rồi!`);
+    document.getElementById('new-word').select();
+    return;
+  }
+
+  const btnContent = document.getElementById('add-btn-content');
+  btnContent.innerHTML = '<span class="spin"></span>';
+  document.getElementById('add-btn').disabled = true;
+
+  // Chờ pinyin-pro load nếu chưa sẵn sàng (CDN)
+  let tries = 0;
+  while (typeof pinyinPro === 'undefined' && tries++ < 20) {
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  const info = lookupWord(zh);
+  pendingWord = {
+    id: Date.now(), zh,
+    pinyin: info.pinyin,
+    meaning: info.meaning || info.meaningEn || '(chưa có nghĩa)',
+    meaningEn: info.meaningEn,
+    source: info.source,
+    status: 'new',
+    sentences: [],
+    added: new Date().toISOString(),
+    reviewStreak: 0,
+  };
+
+  document.getElementById('pv-zh').textContent = zh;
+  document.getElementById('pv-py').textContent  = info.pinyin || '…';
+  document.getElementById('pv-mn').textContent  = info.meaning
+    ? info.meaning
+    : (info.meaningEn ? `(EN) ${info.meaningEn}` : 'Không có trong từ điển — có thể nhập nghĩa thủ công sau');
+  document.getElementById('pv-src').textContent =
+    info.source === 'dict'
+      ? '✓ Có trong từ điển 298 từ'
+      : '⚠ Từ mới — pinyin tự động, chưa có nghĩa tiếng Việt';
+  document.getElementById('add-preview').style.display = 'block';
+
+  btnContent.textContent = '+ Thêm';
+  document.getElementById('add-btn').disabled = false;
+}
+
+function confirmAdd() {
+  if (!pendingWord) return;
+  // Double-check trùng lặp (có thể đã thêm từ thiết bị khác)
+  const existing = DB.words.find(w => w.zh === pendingWord.zh);
+  if (existing) {
+    showToast(`"${pendingWord.zh}" đã có rồi!`);
+    cancelAdd();
+    return;
+  }
+  DB.add(pendingWord);
+  pendingWord = null;
+  document.getElementById('new-word').value = '';
+  document.getElementById('add-preview').style.display = 'none';
+  renderVocab();
+  updateStats();
+  showToast('Đã thêm từ mới ✓');
+}
+function cancelAdd() {
+  pendingWord = null;
+  document.getElementById('add-preview').style.display = 'none';
+}
+
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderVocab();
+}
+
+function renderVocab() {
+  const q = (document.getElementById('search-inp').value || '').toLowerCase();
+  let words = [...DB.words];
+  if (currentFilter !== 'all') words = words.filter(w => w.status === currentFilter);
+  if (q) words = words.filter(w =>
+    w.zh.includes(q) ||
+    (w.pinyin||'').toLowerCase().includes(q) ||
+    (w.meaning||'').toLowerCase().includes(q)
+  );
+
+  const grid = document.getElementById('word-grid');
+  if (!words.length) {
+    grid.innerHTML = `<div style="color:var(--text3);padding:2.5rem 0;grid-column:1/-1">
+      ${DB.words.length ? 'Không có từ nào phù hợp.' : 'Chưa có từ nào — thêm từ đầu tiên nhé! 📖'}
+    </div>`;
+    return;
+  }
+  grid.innerHTML = words.map(w => wordCardHTML(w)).join('');
+}
+
+function wordCardHTML(w) {
+  const tagMap   = { new:'tag-new', learning:'tag-learning', known:'tag-known' };
+  const labelMap = { new:'Mới',     learning:'Đang học',     known:'Đã thuộc' };
+  const sents = (w.sentences || []).map(s => `
+    <div class="sentence-item">
+      <div class="sent-zh">
+        <span>${s.zh}</span>
+        <button class="btn btn-icon btn-sm" onclick="speak('${esc(s.zh)}')" title="Nghe">🔊</button>
+      </div>
+      <div class="py" style="margin-top:2px">${s.pinyin || ''}</div>
+      <div class="meaning-txt">${s.meaning || ''}</div>
+    </div>`).join('');
+
+  const zhSafe = esc(w.zh);
+  return `<div class="wcard" id="wc-${w.id}">
+    <div class="wcard-top">
+      <div class="wcard-zh">${w.zh}</div>
+      <div class="wcard-actions">
+        <button class="btn btn-icon" onclick="speak('${zhSafe}')" title="Phát âm" style="font-size:16px">🔊</button>
+        <button class="btn btn-icon" onclick="deleteWord(${w.id})" title="Xóa" style="font-size:14px">🗑</button>
+      </div>
+    </div>
+    <div class="wcard-meta">
+      <span class="tag ${tagMap[w.status]}">${labelMap[w.status]}</span>
+      <span class="py">${w.pinyin || ''}</span>
+    </div>
+    <div class="meaning-txt" style="margin-top:5px;font-size:13.5px">${w.meaning || '<span style="color:var(--text3);font-size:12px">Chưa có nghĩa — nhập bên dưới</span>'}</div>
+
+    ${w.meaning ? '' : `<div style="margin-top:8px;display:flex;gap:6px">
+      <input class="input-sm" id="mn-${w.id}" placeholder="Nhập nghĩa tiếng Việt..." style="font-size:12.5px"/>
+      <button class="btn btn-sm" onclick="saveMeaning(${w.id})">Lưu</button>
+    </div>`}
+
+    <div class="sentences-wrap">
+      <div style="font-size:11.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Câu ví dụ</div>
+      ${sents || '<div style="font-size:12px;color:var(--text3)">Chưa có — nhập bên dưới</div>'}
+      <div class="add-sent-row">
+        <input class="input-sm" id="si-${w.id}" placeholder="Viết câu ví dụ tiếng Trung..." onkeydown="if(event.key==='Enter')addSentence(${w.id})"/>
+        <button class="btn btn-sm" id="sb-${w.id}" onclick="addSentence(${w.id})">+</button>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px">
+      <button class="btn btn-sm ${w.status==='known'?'btn-green':''}" onclick="setStatus(${w.id},'known')">✓ Thuộc</button>
+      <button class="btn btn-sm ${w.status==='learning'?'':''}'" onclick="setStatus(${w.id},'learning')">📚 Đang học</button>
+      <button class="btn btn-sm" onclick="setStatus(${w.id},'new')">🆕 Mới</button>
+    </div>
+  </div>`;
+}
+
+function saveMeaning(id) {
+  const inp = document.getElementById(`mn-${id}`);
+  const mn = inp.value.trim();
+  if (!mn) return;
+  DB.update(id, { meaning: mn });
+  renderVocab();
+  showToast('Đã lưu nghĩa ✓');
+}
+
+function addSentence(wordId) {
+  const inp = document.getElementById(`si-${wordId}`);
+  const zh  = inp.value.trim();
+  if (!zh) return;
+  const btn = document.getElementById(`sb-${wordId}`);
+  btn.disabled = true; btn.textContent = '⏳';
+
+  // Lấy pinyin câu qua pinyin-pro (offline)
+  const py = getSentencePinyin(zh);
+  const word = DB.get(wordId);
+  if (word) {
+    word.sentences = word.sentences || [];
+    word.sentences.push({ zh, pinyin: py, meaning: '' });
+    DB.update(wordId, { sentences: word.sentences });
+  }
+  inp.value = '';
+  renderVocab();
+  updateStats();
+  showToast('Đã thêm câu ví dụ ✓');
+}
+
+function setStatus(id, status) {
+  DB.update(id, { status });
+  renderVocab();
+  updateStats();
+}
+
+function deleteWord(id) {
+  const word = DB.get(id);
+  if (!word) return;
+  showConfirm(`Xóa từ "<strong>${word.zh}</strong>" ?`, () => {
+    DB.remove(id);
+    renderVocab();
+    updateStats();
+    showToast('Đã xóa ✓');
+  });
+}
+
+// Mini confirm dialog — thay thế confirm() bị chặn trên iOS
+function showConfirm(msg, onOk) {
+  const el = document.getElementById('confirm-modal');
+  document.getElementById('confirm-msg').innerHTML = msg;
+  el.style.display = 'flex';
+  document.getElementById('confirm-ok').onclick = () => {
+    el.style.display = 'none';
+    onOk();
+  };
+  document.getElementById('confirm-cancel').onclick = () => {
+    el.style.display = 'none';
+  };
+}
+
+// ══════════════════════════════════════════════════
+// REVIEW PAGE
+// ══════════════════════════════════════════════════
+function setReviewMode(mode, el) {
+  reviewMode = mode;
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  startReview();
+}
+
+function startReview() {
+  if (hanziWriter) { try { hanziWriter.cancelQuiz(); } catch(e){} hanziWriter = null; }
+  const pool = DB.words.filter(w => w.status !== 'known');
+  reviewQueue = shuffle(pool.length ? pool : [...DB.words]).slice(0, 20);
+  reviewIdx   = 0;
+  reviewScore = { right: 0, wrong: 0 };
+
+  if (!reviewQueue.length) {
+    document.getElementById('review-content').innerHTML =
+      `<div style="text-align:center;padding:4rem;color:var(--text3)">Chưa có từ vựng. Thêm từ ở tab Từ vựng nhé!</div>`;
+    return;
+  }
+  renderReview();
+}
+
+function renderReview() {
+  if (reviewIdx >= reviewQueue.length) {
+    renderReviewDone(); return;
+  }
+  if (reviewMode === 'stroke') renderStroke();
+  else renderFlash();
+}
+
+// ── Flashcard mode ──
+function renderFlash() {
+  const w   = reviewQueue[reviewIdx];
+  const pct = Math.round(reviewIdx / reviewQueue.length * 100);
+  document.getElementById('review-content').innerHTML = `
+    <div class="review-wrap">
+      <div class="prog-bar-bg"><div class="prog-bar" style="width:${pct}%"></div></div>
+      <div style="text-align:right;font-size:12px;color:var(--text3);margin-bottom:8px">${reviewIdx}/${reviewQueue.length}</div>
+      <div class="review-card" id="rv-card">
+        <div class="review-zh">${w.zh}</div>
+        <div style="font-size:12.5px;color:var(--text3);margin-top:6px">Bạn còn nhớ không?</div>
+        <div id="rv-reveal" style="display:none" class="review-reveal">
+          <div class="py" style="font-size:18px">${w.pinyin || getPinyin(w.zh)}</div>
+          <div style="font-size:17px;color:var(--text);margin-top:6px">${w.meaning || '(chưa có nghĩa)'}</div>
+          <button class="btn btn-sm" onclick="speak('${esc(w.zh)}')" style="margin-top:12px;font-size:14px">🔊 Nghe phát âm</button>
+        </div>
+        <div style="margin-top:1.4rem">
+          <button class="btn" id="rv-show-btn" onclick="revealFlash()">Xem đáp án</button>
+        </div>
+        <div class="review-btns" id="rv-btns" style="display:none">
+          <button class="btn btn-wrong" style="padding:10px 20px;font-size:14px" onclick="flashAnswer(false)">✗ Chưa nhớ</button>
+          <button class="btn btn-green" style="padding:10px 20px;font-size:14px" onclick="flashAnswer(true)">✓ Đã nhớ</button>
+        </div>
+      </div>
+    </div>`;
+}
+function revealFlash() {
+  document.getElementById('rv-reveal').style.display = 'block';
+  document.getElementById('rv-show-btn').style.display = 'none';
+  document.getElementById('rv-btns').style.display = 'flex';
+}
+function flashAnswer(correct) {
+  const w = reviewQueue[reviewIdx];
+  if (correct) {
+    reviewScore.right++;
+    const word = DB.get(w.id);
+    if (word) {
+      const streak = (word.reviewStreak || 0) + 1;
+      DB.update(w.id, { reviewStreak: streak, status: streak >= 3 ? 'known' : 'learning' });
+    }
+  } else {
+    reviewScore.wrong++;
+    DB.update(w.id, { reviewStreak: 0, status: w.status === 'known' ? 'learning' : w.status });
+  }
+  reviewIdx++;
+  updateStats();
+  renderReview();
+}
+
+// ── Stroke quiz mode (hanzi-writer) ──
+function renderStroke() {
+  const w   = reviewQueue[reviewIdx];
+  const pct = Math.round(reviewIdx / reviewQueue.length * 100);
+  // Chỉ lấy ký tự đầu tiên (hanzi-writer xử lý 1 chữ)
+  const char = w.zh[0];
+
+  document.getElementById('review-content').innerHTML = `
+    <div class="stroke-wrap">
+      <div class="prog-bar-bg"><div class="prog-bar" style="width:${pct}%"></div></div>
+      <div style="text-align:right;font-size:12px;color:var(--text3);margin-bottom:8px">${reviewIdx}/${reviewQueue.length}</div>
+      <div class="stroke-card">
+        <div style="font-size:14px;font-weight:500;margin-bottom:4px">Viết chữ: <span style="color:var(--red);font-size:18px">${w.zh}</span></div>
+        <div class="py">${w.pinyin || getPinyin(w.zh)}</div>
+        <div class="meaning-txt" style="margin-bottom:10px">${w.meaning || ''}</div>
+        <div class="stroke-info" id="stroke-msg">Vẽ từng nét theo thứ tự đúng</div>
+        <div id="stroke-target" style="width:200px;height:200px;background:var(--surface2);border-radius:12px;margin:0 auto 12px"></div>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="animateStroke()">▶ Xem mẫu</button>
+          <button class="btn btn-sm" onclick="retryStroke()">↺ Thử lại</button>
+          <button class="btn btn-sm" onclick="speak('${esc(w.zh)}')">🔊 Nghe</button>
+          <button class="btn btn-sm" onclick="skipStroke()">→ Bỏ qua</button>
+        </div>
+      </div>
+    </div>`;
+
+  // Khởi tạo hanzi-writer
+  if (typeof HanziWriter === 'undefined') {
+    document.getElementById('stroke-msg').textContent = '⚠ Thư viện hanzi-writer chưa load — cần kết nối internet lần đầu';
+    return;
+  }
+  try {
+    hanziWriter = HanziWriter.create('stroke-target', char, {
+      width: 200, height: 200, padding: 16,
+      showOutline: true,
+      strokeColor: '#C0391A',
+      outlineColor: '#D0C8BC',
+      drawingColor: '#1A5280',
+      drawingWidth: 5,
+      strokeAnimationSpeed: 1,
+      delayBetweenStrokes: 200,
+      markStrokeCorrectAfterMisses: 3,
+      highlightOnComplete: true,
+      highlightColor: '#2D7A3A',
+      onLoadCharDataError: () => {
+        document.getElementById('stroke-msg').textContent = `⚠ Không tìm thấy dữ liệu nét cho "${char}" — thử ký tự khác`;
+      }
+    });
+    hanziWriter.quiz({
+      onCorrectStroke: () => {
+        document.getElementById('stroke-msg').textContent = '✓ Nét đúng! Tiếp tục...';
+      },
+      onMistake: () => {
+        document.getElementById('stroke-msg').textContent = '✗ Nét chưa đúng, thử lại';
+      },
+      onComplete: (summary) => {
+        const msg = summary.totalMistakes === 0
+          ? '🎉 Hoàn hảo! Không có lỗi nào!'
+          : `✓ Hoàn thành! ${summary.totalMistakes} lỗi`;
+        document.getElementById('stroke-msg').textContent = msg;
+        reviewScore.right++;
+        const word = DB.get(w.id);
+        if (word) {
+          const streak = (word.reviewStreak || 0) + 1;
+          DB.update(w.id, { reviewStreak: streak, status: streak >= 3 ? 'known' : 'learning' });
+        }
+        updateStats();
+        setTimeout(() => { reviewIdx++; renderReview(); }, 1800);
+      }
+    });
+  } catch(e) {
+    document.getElementById('stroke-msg').textContent = `Lỗi: ${e.message}`;
+  }
+}
+function animateStroke() {
+  if (hanziWriter) hanziWriter.animateCharacter();
+}
+function retryStroke() {
+  if (hanziWriter) { try { hanziWriter.cancelQuiz(); } catch(e){} }
+  renderStroke();
+}
+function skipStroke() {
+  reviewScore.wrong++;
+  reviewIdx++;
+  renderReview();
+}
+
+function renderReviewDone() {
+  if (hanziWriter) { try { hanziWriter.cancelQuiz(); } catch(e){} hanziWriter = null; }
+  const total = reviewScore.right + reviewScore.wrong;
+  const pct   = total ? Math.round(reviewScore.right / total * 100) : 0;
+  const emoji = pct >= 80 ? '🎉' : pct >= 50 ? '💪' : '📚';
+  document.getElementById('review-content').innerHTML = `
+    <div class="done-wrap">
+      <div class="done-emoji">${emoji}</div>
+      <div style="font-size:20px;font-weight:600;margin-bottom:5px">Hoàn thành ôn tập!</div>
+      <div style="color:var(--text3);font-size:13.5px">Đã ôn ${total} từ hôm nay</div>
+      <div class="stats-row">
+        <div class="stat-box"><div class="stat-num" style="color:var(--green)">${reviewScore.right}</div><div class="stat-lbl">Đã nhớ</div></div>
+        <div class="stat-box"><div class="stat-num" style="color:var(--red)">${reviewScore.wrong}</div><div class="stat-lbl">Chưa nhớ</div></div>
+        <div class="stat-box"><div class="stat-num">${pct}%</div><div class="stat-lbl">Chính xác</div></div>
+      </div>
+      <button class="btn btn-primary" onclick="startReview()" style="font-size:14px;padding:10px 24px">Ôn tiếp</button>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════
+// PROGRESS PAGE
+// ══════════════════════════════════════════════════
+function renderProgress() {
+  const words = DB.words;
+  const total = words.length;
+  const byStatus = { new: 0, learning: 0, known: 0 };
+  let totalSents = 0;
+  words.forEach(w => { byStatus[w.status]++; totalSents += (w.sentences||[]).length; });
+
+  const pct = s => total ? Math.round(byStatus[s] / total * 100) : 0;
+  const rows = words.map(w => {
+    const tagMap   = { new:'tag-new', learning:'tag-learning', known:'tag-known' };
+    const labelMap = { new:'Mới', learning:'Đang học', known:'Đã thuộc' };
+    const d = new Date(w.added);
+    return `<tr>
+      <td><strong style="font-size:16px;letter-spacing:1px">${w.zh}</strong></td>
+      <td class="py">${w.pinyin || ''}</td>
+      <td class="meaning-txt">${w.meaning || '<span style="color:var(--text3)">—</span>'}</td>
+      <td><span class="tag ${tagMap[w.status]}">${labelMap[w.status]}</span></td>
+      <td style="color:var(--text3)">${(w.sentences||[]).length}</td>
+      <td style="color:var(--text3);font-size:12px">${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('progress-content').innerHTML = `
+    <div class="level-grid">
+      <div class="level-card">
+        <div class="level-card-top"><div class="level-dot" style="background:var(--text3)"></div><span class="level-title" style="color:var(--text2)">Từ mới</span></div>
+        <div class="level-count">${byStatus.new}</div>
+        <div class="level-pct">${pct('new')}% tổng</div>
+      </div>
+      <div class="level-card">
+        <div class="level-card-top"><div class="level-dot" style="background:var(--amber)"></div><span class="level-title" style="color:var(--amber)">Đang học</span></div>
+        <div class="level-count" style="color:var(--amber)">${byStatus.learning}</div>
+        <div class="level-pct">${pct('learning')}% tổng</div>
+      </div>
+      <div class="level-card">
+        <div class="level-card-top"><div class="level-dot" style="background:var(--green)"></div><span class="level-title" style="color:var(--green)">Đã thuộc</span></div>
+        <div class="level-count" style="color:var(--green)">${byStatus.known}</div>
+        <div class="level-pct">${pct('known')}% tổng</div>
+      </div>
+      <div class="level-card">
+        <div class="level-card-top"><div class="level-dot" style="background:var(--red)"></div><span class="level-title">Tổng cộng</span></div>
+        <div class="level-count" style="color:var(--red)">${total}</div>
+        <div class="level-pct">${totalSents} câu ví dụ</div>
+      </div>
+    </div>
+    ${total ? `
+    <!-- Progress bar visual -->
+    <div class="card" style="margin-bottom:1.2rem">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Phân bố trạng thái</div>
+      <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px">
+        <div style="background:var(--red-dim);flex:${byStatus.new}" title="Mới: ${byStatus.new}"></div>
+        <div style="background:var(--amber);opacity:.6;flex:${byStatus.learning}" title="Đang học: ${byStatus.learning}"></div>
+        <div style="background:var(--green);opacity:.7;flex:${byStatus.known}" title="Đã thuộc: ${byStatus.known}"></div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:8px;font-size:11.5px;color:var(--text3)">
+        <span>🔴 Mới: ${byStatus.new}</span>
+        <span>🟡 Đang học: ${byStatus.learning}</span>
+        <span>🟢 Đã thuộc: ${byStatus.known}</span>
+      </div>
+    </div>
+    <div class="card" style="overflow-x:auto;padding:0">
+      <table class="words-table">
+        <thead><tr><th>Chữ Hán</th><th>Pinyin</th><th>Nghĩa tiếng Việt</th><th>Trạng thái</th><th>Câu VD</th><th>Ngày thêm</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>` : `<div style="text-align:center;padding:3rem;color:var(--text3)">Chưa có từ nào. Bắt đầu học thôi! 📖</div>`}
+  `;
+}
+
+// ══════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.bnav-item[data-bpage]').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const sideEl = document.querySelector(`[data-page="${name}"]`);
+  if (sideEl) sideEl.classList.add('active');
+  const botEl = document.querySelector(`[data-bpage="${name}"]`);
+  if (botEl) botEl.classList.add('active');
+  // Scroll lên đầu trang trên mobile
+  window.scrollTo(0, 0);
+  if (name === 'review')   startReview();
+  if (name === 'progress') renderProgress();
+}
+
+// ══════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════
+function updateStats() {
+  const w = DB.words;
+  document.getElementById('s-total').textContent   = w.length;
+  document.getElementById('s-known').textContent   = w.filter(x => x.status === 'known').length;
+  document.getElementById('s-learning').textContent = w.filter(x => x.status === 'learning').length;
+  document.getElementById('s-sents').textContent   = w.reduce((a, x) => a + (x.sentences||[]).length, 0);
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function esc(s) {
+  return (s || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ── Init ──
+initCloud();
+</script>
+</body>
+</html>
