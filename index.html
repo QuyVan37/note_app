@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -1081,8 +1080,8 @@ function openSetup() {
     // Hiện lại config dạng text để user xem/sửa
     const lines = Object.entries(cfg)
       .map(([k,v]) => `${k}: "${v}"`)
-      .join(',
-');
+      .join(',');
+
     document.getElementById('fb-config-paste').value = lines;
   }
   const tr = document.getElementById('test-result');
