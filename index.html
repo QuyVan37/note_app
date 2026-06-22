@@ -345,6 +345,43 @@ body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:var(--
   text-align:center;
 }
 .confirm-btns{display:flex;gap:8px;margin-top:1.2rem;justify-content:center}
+
+.hanzii-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 500px;
+  height: 100vh;
+  background: #fff;
+  z-index: 9999;
+  box-shadow: -4px 0 20px rgba(0,0,0,.15);
+
+  /* Ẩn bên ngoài màn hình */
+  transform: translateX(100%);
+  transition: transform 0.35s ease-in-out;
+}
+
+.hanzii-sidebar.show {
+  transform: translateX(0);
+}
+
+.hanzii-sidebar iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.close-btn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10000;
+  border: none;
+  background: #eee;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 6px 10px;
+}
 </style>
 </head>
 <body>
@@ -436,6 +473,7 @@ appId: "1:123456789:web:abc123"'></textarea>
     </div>
   </aside>
 
+
   <!-- Main -->
   <main class="main">
 
@@ -511,6 +549,14 @@ appId: "1:123456789:web:abc123"'></textarea>
     </div>
 
   </main>
+
+
+<div id="hanziiSidebar" class="hanzii-sidebar">
+  <button class="close-btn" onclick="closeHanzii()">✕</button>
+  <iframe id="hanziiFrame"></iframe>
+</div>
+
+
 
   <!-- Bottom Tab Bar (chỉ hiện trên điện thoại) -->
   <nav class="bottom-nav" id="bottom-nav">
@@ -1176,6 +1222,42 @@ async function saveFirebaseConfig() {
   await initCloud();
 }
 
+// ── Mở Hanzii.net tra từ/câu ──
+// function openHanzii(zh) {
+//   const encoded = encodeURIComponent(zh);
+//   // Dùng /search/word/ cho từ đơn, /search/sentence/ cho câu (>4 ký tự)
+//   const type = zh.replace(/\s/g,'').length > 4 ? 'word' : 'word';
+//   window.open(`https://hanzii.net/search/${type}/${encoded}?hl=vi`, '_blank');
+// }
+
+
+// function openHanzii(zh) {
+//   const encoded = encodeURIComponent(zh);
+//   document.getElementById('hanziiFrame').src =
+//     `https://hanzii.net/search/word/${encoded}?hl=vi`;
+// }
+
+function openHanzii(zh) {
+  const encoded = encodeURIComponent(zh);
+
+  document.getElementById('hanziiFrame').src =
+    `https://hanzii.net/search/word/${encoded}?hl=vi`;
+
+  document.getElementById('hanziiSidebar')
+    .classList.add('show');
+
+  document.getElementById('overlay')
+    .classList.add('show');
+}
+
+function closeHanzii() {
+  document.getElementById('hanziiSidebar')
+    .classList.remove('show');
+
+  document.getElementById('overlay')
+    .classList.remove('show');
+}
+
 // ── State ──
 let currentFilter = 'all';
 let pendingWord   = null;
@@ -1229,10 +1311,12 @@ async function addWord() {
   document.getElementById('pv-mn').textContent  = info.meaning
     ? info.meaning
     : (info.meaningEn ? `(EN) ${info.meaningEn}` : 'Không có trong từ điển — có thể nhập nghĩa thủ công sau');
-  document.getElementById('pv-src').textContent =
-    info.source === 'dict'
-      ? '✓ Có trong từ điển 298 từ'
-      : '⚠ Từ mới — pinyin tự động, chưa có nghĩa tiếng Việt';
+  const srcEl = document.getElementById('pv-src');
+  if (info.source === 'dict') {
+    srcEl.innerHTML = '✓ Có trong từ điển nội bộ';
+  } else {
+    srcEl.innerHTML = `⚠ Chưa có nghĩa — <a href="#" onclick="openHanzii(document.getElementById('pv-zh').textContent);return false" style="color:var(--blue)">tra Hanzii.net</a> để xem đầy đủ`;
+  }
   document.getElementById('add-preview').style.display = 'block';
 
   btnContent.textContent = '+ Thêm';
@@ -1291,14 +1375,16 @@ function renderVocab() {
 function wordCardHTML(w) {
   const tagMap   = { new:'tag-new', learning:'tag-learning', known:'tag-known' };
   const labelMap = { new:'Mới',     learning:'Đang học',     known:'Đã thuộc' };
-  const sents = (w.sentences || []).map(s => `
+  const sents = (w.sentences || []).map((s,si) => `
     <div class="sentence-item">
       <div class="sent-zh">
         <span>${s.zh}</span>
         <button class="btn btn-icon btn-sm" onclick="speak('${esc(s.zh)}')" title="Nghe">🔊</button>
+        <button class="btn btn-icon btn-sm" onclick="openHanzii('${esc(s.zh)}')" title="Tra Hanzii" style="font-size:12px">📖</button>
+        <button class="btn btn-icon btn-sm" onclick="deleteSentence(${w.id},${si})" title="Xóa câu" style="font-size:11px">🗑</button>
       </div>
       <div class="py" style="margin-top:2px">${s.pinyin || ''}</div>
-      <div class="meaning-txt">${s.meaning || ''}</div>
+      <div class="meaning-txt">${s.meaning || '<span style="color:var(--text3);font-size:11.5px">— tra Hanzii để xem nghĩa câu</span>'}</div>
     </div>`).join('');
 
   const zhSafe = esc(w.zh);
@@ -1307,6 +1393,7 @@ function wordCardHTML(w) {
       <div class="wcard-zh">${w.zh}</div>
       <div class="wcard-actions">
         <button class="btn btn-icon" onclick="speak('${zhSafe}')" title="Phát âm" style="font-size:16px">🔊</button>
+        <button class="btn btn-icon" onclick="openHanzii('${zhSafe}')" title="Tra Hanzii.net" style="font-size:15px">📖</button>
         <button class="btn btn-icon" onclick="deleteWord(${w.id})" title="Xóa" style="font-size:14px">🗑</button>
       </div>
     </div>
@@ -1345,6 +1432,17 @@ function saveMeaning(id) {
   DB.update(id, { meaning: mn });
   renderVocab();
   showToast('Đã lưu nghĩa ✓');
+}
+
+function deleteSentence(wordId, sentIdx) {
+  const word = DB.get(wordId);
+  if (!word || !word.sentences) return;
+  showConfirm('Xóa câu ví dụ này?', () => {
+    word.sentences.splice(sentIdx, 1);
+    DB.update(wordId, { sentences: word.sentences });
+    renderVocab();
+    showToast('Đã xóa câu ✓');
+  });
 }
 
 function addSentence(wordId) {
